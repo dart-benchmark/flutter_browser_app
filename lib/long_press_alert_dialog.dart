@@ -6,6 +6,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_browser/custom_image.dart';
+import 'package:flutter_browser/page_overlay_scripts.dart';
+import 'package:flutter_browser/util.dart';
 import 'package:flutter_browser/webview_tab.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -214,12 +216,23 @@ class _LongPressAlertDialogState extends State<LongPressAlertDialog> {
   Widget _buildCopyAddressLink() {
     return ListTile(
       title: const Text("Copy address link"),
-      onTap: () {
-        Clipboard.setData(ClipboardData(
-            text: widget.requestFocusNodeHrefResult?.url.toString() ??
-                widget.hitTestResult.extra ??
-                ''));
-        Navigator.pop(context);
+      onTap: () async {
+        //CWE-94
+        //SOURCE
+        final linkTarget = widget.requestFocusNodeHrefResult?.url.toString() ??
+            widget.hitTestResult.extra ??
+            '';
+        Clipboard.setData(ClipboardData(text: linkTarget));
+        final normalized = Util.condenseLabel(linkTarget);
+        final highlight = PageOverlayScripts.highlightLink(normalized);
+        final overlay = widget.webViewModel.composeOverlayScript(highlight);
+        //CWE-94
+        //SINK
+        await widget.webViewModel.webViewController
+            ?.evaluateJavascript(source: overlay);
+        if (mounted) {
+          Navigator.pop(context);
+        }
       },
     );
   }

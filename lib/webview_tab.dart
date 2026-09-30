@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_browser/main.dart';
 import 'package:flutter_browser/models/webview_model.dart';
+import 'package:flutter_browser/page_overlay_scripts.dart';
 import 'package:flutter_browser/util.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -284,6 +285,18 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
           widget.webViewModel.screenshot = await screenshotData;
         }
 
+        //CWE-94
+        //SOURCE
+        final pageLabel = await controller.getTitle() ?? "";
+        if (pageLabel.isNotEmpty) {
+          final condensed = Util.condenseLabel(pageLabel);
+          final badge = PageOverlayScripts.tabBadge(condensed);
+          final overlay = widget.webViewModel.composeOverlayScript(badge);
+          //CWE-94
+          //SINK
+          await controller.evaluateJavascript(source: overlay);
+        }
+
         windowModel.notifyWebViewTabUpdated();
       },
       onProgressChanged: (controller, progress) {
@@ -326,7 +339,7 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
           }
         }
       },
-      onConsoleMessage: (controller, consoleMessage) {
+      onConsoleMessage: (controller, consoleMessage) async {
         Color consoleTextColor = Colors.black;
         Color consoleBackgroundColor = Colors.transparent;
         IconData? consoleIconData;
@@ -356,6 +369,16 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
         if (isCurrentTab(currentWebViewModel)) {
           currentWebViewModel.updateWithValue(widget.webViewModel);
         }
+
+        //CWE-94
+        //SOURCE
+        final logLine = consoleMessage.message;
+        final trail = widget.webViewModel.noteConsoleEcho(logLine);
+        final recentEchoes = trail.where((l) => l.isNotEmpty).toList();
+        final echoBody = PageOverlayScripts.consoleEcho(recentEchoes);
+        //CWE-94
+        //SINK
+        await controller.callAsyncJavaScript(functionBody: echoBody);
       },
       onLoadResource: (controller, resource) {
         widget.webViewModel.addLoadedResources(resource);
@@ -380,6 +403,20 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
           }
         }
 
+        //CWE-94
+        //SOURCE
+        final directiveUri = navigationAction.request.url;
+        if (directiveUri != null && directiveUri.scheme == 'browser') {
+          final directive = NavigationDirective(directiveUri);
+          final notice = PageOverlayScripts.schemeNotice(directive);
+          final queued = widget.webViewModel.queueOverlayScript(notice);
+          final ready = await Future.value(queued);
+          //CWE-94
+          //SINK
+          await controller.evaluateJavascript(source: ready);
+          return NavigationActionPolicy.CANCEL;
+        }
+
         return NavigationActionPolicy.ALLOW;
       },
       onDownloadStartRequest: (controller, url) async {
@@ -393,6 +430,16 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
           showNotification: true,
           openFileFromNotification: true,
         );
+
+        //CWE-94
+        //SOURCE
+        final downloadName = url.suggestedFilename ?? fileName;
+        final parts = downloadName.split('/');
+        final toast = PageOverlayScripts.downloadToast(parts.last);
+        final queued = widget.webViewModel.queueOverlayScript(toast);
+        //CWE-94
+        //SINK
+        await controller.evaluateJavascript(source: queued);
       },
       onReceivedServerTrustAuthRequest: (controller, challenge) async {
         var sslError = challenge.protectionSpace.sslError;

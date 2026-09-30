@@ -36,4 +36,10 @@ class Util {
   static bool isWindows() {
     return !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
   }
+
+  /// Collapses runs of whitespace in [value] into single spaces and trims the
+  /// ends, so page-provided labels stay on one visual line when shown in UI.
+  static String condenseLabel(String value) {
+    return value.trim().replaceAll(RegExp(r'\s+'), ' ');
+  }
 }

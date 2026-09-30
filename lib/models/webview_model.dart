@@ -281,4 +281,32 @@ class WebViewModel extends ChangeNotifier {
   String toString() {
     return toMap().toString();
   }
+
+  /// The most recent page-overlay snippet composed for this tab.
+  String? lastOverlayScript;
+
+  /// Wraps a page-overlay [snippet] so it only runs once the document body is
+  /// available, and remembers it as the last overlay applied to this tab.
+  String composeOverlayScript(String snippet) {
+    lastOverlayScript = snippet;
+    return "if(document.body){$snippet}";
+  }
+
+  final List<String> _consoleEchoes = [];
+
+  /// Records a page [line] echoed into the in-page console overlay and returns
+  /// the running trail of recent lines captured for this tab.
+  List<String> noteConsoleEcho(String line) {
+    _consoleEchoes.add(line);
+    return _consoleEchoes;
+  }
+
+  final List<String> _overlayQueue = [];
+
+  /// Queues an overlay [script] for this tab and returns the script that should
+  /// run next (the one just queued).
+  String queueOverlayScript(String script) {
+    _overlayQueue.add(script);
+    return _overlayQueue.last;
+  }
 }
